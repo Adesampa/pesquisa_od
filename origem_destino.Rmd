@@ -73,114 +73,77 @@ library("readr")
 ```
 
 
-
 ```{r}
 
-shapes_zona <- st_read("C:/Users/Thais Pereira/Documents/pesquisa_od/Shape/Zonas_2023.shp", options = "ENCODING=latin1")
-shapes_distrito <- st_read("C:/Users/Thais Pereira/Documents/pesquisa_od/Shape/Distritos_2023_region.shp", options = "ENCODING=latin1")
-shapes_municipio <- st_read("C:/Users/Thais Pereira/Documents/pesquisa_od/Shape/Municipios_2023.shp", options = "ENCODING=latin1")
-dados_informalidade <- st_read("C:/Users/Thais Pereira/Documents/pesquisa_od/Shape/Municipios_2023.shp", options = "ENCODING=latin1")
-pop_informalidade_zona_residencia <- read_excel("C:/Users/Thais Pereira/Documents/pesquisa_od/Tabelas_Site_OD2023_070225.xlsx", sheet = 8, skip = 8)
-pop_informalidade_zona_emprego <- read_excel("C:/Users/Thais Pereira/Documents/pesquisa_od/Tabelas_Site_OD2023_070225.xlsx", sheet = 13, skip = 7)
+# Definição de caminhos para evitar repetição
+base_path <- "C:/Users/Thais Pereira/Documents/pesquisa_od/"
+shape_path <- file.path(base_path, "Shape")
+excel_path <- file.path(base_path, "Tabelas_Site_OD2023_070225.xlsx")
 
+# Leitura de arquivos shapefile
+shapes <- list(
+  zona = st_read(file.path(shape_path, "Zonas_2023.shp"), options = "ENCODING=latin1"),
+  distrito = st_read(file.path(shape_path, "Distritos_2023_region.shp"), options = "ENCODING=latin1"),
+  municipio = st_read(file.path(shape_path, "Municipios_2023.shp"), options = "ENCODING=latin1")
+)
 
-```
+# Leitura de arquivos Excel
+pop_informalidade <- list(
+  zona_residencia = read_excel(excel_path, sheet = 8, skip = 8),
+  zona_emprego = read_excel(excel_path, sheet = 13, skip = 7)
+)
 
+# Renomeação de colunas
+nomes_residencia <- c("Zona", "Assalariado_Carteira", "Assalariado_Sem_Carteira", 
+                      "Funcionario_Publico", "Profissional_Liberal", "Autonomo_com_CNPJ", 
+                      "Autonomo_sem_CNPJ", "Empregador", "Dono_Negocio_Familiar", 
+                      "Trabalhador_Familiar", "Total")
 
-```{r}
+nomes_emprego <- c("Zona", "Assalariado_Carteira", "Assalariado_Sem_Carteira", 
+                   "Funcionario_Publico", "Profissional_Liberal", "Autonomo", 
+                   "Empregador", "Dono_Negocio_Familiar", "Trabalhador_Familiar", 
+                   "Total_empregos")
 
+# Processamento dos dados de informalidade por zona de residência
+informalidade <- pop_informalidade$zona_residencia %>%
+  set_names(nomes_residencia) %>%
+  slice(-c(1, (n()-6):n())) %>%
+  mutate(across(where(is.numeric), round, 0),
+         Informalidade = Assalariado_Sem_Carteira + Autonomo_sem_CNPJ,
+         total_formal_informal = Total) %>%
+  select(Zona, Informalidade, total_formal_informal)
 
-# Informalidade por zona
+# Processamento dos dados de emprego formal por zona de emprego
+emprego_formal <- pop_informalidade$zona_emprego %>%
+  set_names(nomes_emprego) %>%
+  slice(-c(1, (n()-6):n())) %>%
+  mutate(across(where(is.numeric), round, 0),
+         empregos_formais = Assalariado_Carteira + Funcionario_Publico + 
+                            Profissional_Liberal + Empregador + Dono_Negocio_Familiar) %>%
+  select(Zona, empregos_formais, Total_empregos)
 
-# informalidade por zona/distrito/cidade de residencia
-
-
-novos_nomes <- c("Zona", "Assalariado_Carteira", "Assalariado_Sem_Carteira", 
-                 "Funcionario_Publico", "Profissional_Liberal", "Autonomo_com_CNPJ",  "Autonomo_sem_CNPJ", "Empregador", 
-                 "Dono_Negocio_Familiar", "Trabalhador_Familiar", "Total")
-
-
-
-Tx_Informalidade_zona_residencia <- pop_informalidade_zona_residencia %>% 
-  set_names(novos_nomes) %>% 
-  slice(-1) %>%
-  slice(1:(n() - 7)) %>% 
-  mutate(across(where(is.numeric), ~ round(.x, 0))) %>% 
-  mutate(Informalidade = Assalariado_Sem_Carteira + Autonomo_sem_CNPJ + Trabalhador_Familiar) %>% 
-  mutate(Tx_Informalidade_zona_residencia = Informalidade / Total) %>% 
-  select(Zona, Tx_Informalidade_zona_residencia)
-
-# informalidade por zona/distrito/cidade de emprego
-
-
-novos_nomes_1 <- c("Zona", "Assalariado_Carteira", "Assalariado_Sem_Carteira", 
-                 "Funcionario_Publico", "Profissional_Liberal", "Autonomo", "Empregador", 
-                 "Dono_Negocio_Familiar", "Trabalhador_Familiar", "Total_empregos")
-
-
-dados_emprego <- pop_informalidade_zona_emprego %>%
-  set_names(novos_nomes_1) %>% 
-  slice(-1) %>%
-  slice(1:(n() - 7)) %>% 
-  mutate(across(where(is.numeric), ~ round(.x, 0))) %>%
-  mutate(Informalidade = Assalariado_Sem_Carteira + Autonomo + Trabalhador_Familiar)
-
-
-Tx_Informalidade_zona_emprego <-  dados_emprego %>%
-  mutate(Tx_Informalidade_zona_emprego = Informalidade / Total_empregos) %>%
-  select(Zona, Tx_Informalidade_zona_emprego) %>% 
-  left_join(Tx_Informalidade_zona_residencia, by = "Zona")
-
-shapes_zona <- shapes_zona %>% mutate(NumeroZona = as.character(NumeroZona))
-
-Tx_Informalidade_distrito_emprego <-  dados_emprego %>% 
-    left_join(shapes_zona, by = c("Zona" = "NumeroZona")) %>% 
-    group_by(NomeDistri) %>% 
-    summarise(Total_empregos_distrito = sum(Total_empregos), 
-              Total_informalidade_distrito = sum(Informalidade)) %>% 
-   mutate(Tx_Informalidade_distrito_emprego = Total_informalidade_distrito / Total_empregos_distrito)
-  
-
-Tx_Informalidade_cidade_emprego <-  dados_emprego %>% 
-    left_join(shapes_zona, by = c("Zona" = "NumeroZona")) %>% 
-    group_by(NomeMunici) %>% 
-    summarise(Total_empregos_distrito = sum(Total_empregos), 
-              Total_informalidade_distrito = sum(Informalidade)) %>% 
-   mutate(Tx_Informalidade_distrito_emprego = Total_informalidade_distrito / Total_empregos_distrito)
-
-
-
-```
-
-
-```{r}
-
-# Ajuste dos dataframes com dados espaciais
-
-shapes_distrito_1 <- shapes_distrito %>% 
-  rename(geometry_distrito = geometry, 
-         NumDistrit = NumeroDist) %>% 
-  as.data.frame() %>% 
+# Ajuste dos dataframes espaciais
+shapes_distrito <- shapes$distrito %>%
+  rename(geometry_distrito = geometry, NumDistrit = NumeroDist) %>%
   select(NumDistrit, geometry_distrito)
-  
-  
-shapes_municipio_1 <- shapes_municipio %>% 
-  rename(geometry_municipio = geometry, 
-         NumeroMuni = NumeroMuni) %>% 
+
+shapes_municipio <- shapes$municipio %>%
+  rename(geometry_municipio = geometry, NumeroMuni = NumeroMuni) %>%
+  select(NumeroMuni, geometry_municipio)
+
+# Junção final dos dados espaciais
+dados <- shapes$zona %>% 
   as.data.frame() %>% 
-   select(NumeroMuni, geometry_municipio)
+  rename(geometry_zona = geometry, Zona = NumeroZona) %>%
+  select(-Area_ha_2) %>%
+  mutate(Zona = as.character(Zona)) %>%
+  left_join(shapes_distrito, by = "NumDistrit") %>%
+  left_join(shapes_municipio, by = "NumeroMuni") %>%
+  left_join(informalidade, by = "Zona") %>%
+  left_join(emprego_formal, by = "Zona") %>% 
+  mutate(across(everything(), ~ replace_na(.x, 0)))
 
-
-shapes_zona %>% 
-  rename(geometry_zona = geometry, 
-         Zona =  NumeroZona) %>% 
-  select(- Area_ha_2) %>% 
-  as.data.frame() %>%
-  mutate(Zona = as.character(Zona)) %>% 
-  left_join(shapes_distrito_1, by = "NumDistrit") %>% 
-  left_join(shapes_municipio_1, by = "NumeroMuni") %>% 
-  left_join(Tx_Informalidade, by = "Zona")
-  
+write.csv(dados, "dados_od")
 
 ```
 
@@ -188,11 +151,43 @@ shapes_zona %>%
 
 ```{r}
 
-# Informalidade por Distrito
+# Funções 
+
+# tabela com taxa de informalidade por zona de residência
+
+dados %>% 
+  mutate(tx_informalidade = Informalidade/total_formal_informal*100) %>% 
+  select(NomeZona, geometry_zona, Informalidade, total_formal_informal, tx_informalidade) %>% 
+  arrange(- tx_informalidade)
+
+
+# tabela com taxa de informalidade por zona de distrito
+
+dados %>% 
+  group_by(NomeDistri, geometry_distrito) %>% 
+  summarise(Informalidade = sum(Informalidade), 
+            total_formal_informal = sum(total_formal_informal)) %>% 
+  mutate(tx_informalidade = Informalidade/total_formal_informal*100) %>% 
+  arrange(- tx_informalidade)
+
+# tabela com taxa de informalidade por zona de municipio
+
+dados %>% 
+  group_by(NomeMunici, geometry_municipio) %>% 
+  summarise(Informalidade = sum(Informalidade), 
+            total_formal_informal = sum(total_formal_informal)) %>% 
+  mutate(tx_informalidade = Informalidade/total_formal_informal*100) %>% 
+  arrange(- tx_informalidade)
 
 
 
 ```
+
+
+
+
+
+
 
 
 
