@@ -1,0 +1,205 @@
+---
+title: "Untitled"
+output: html_document
+date: "2025-02-12"
+---
+
+```{r setup, include=FALSE}
+
+knitr::opts_chunk$set(global.par = TRUE)
+knitr::opts_knit$set(globalenv = TRUE)
+
+(knitr::opts_chunk$set(
+	echo = FALSE,
+	error = FALSE,
+	message = FALSE,
+	warning = FALSE))
+
+```
+
+```{r}
+
+library("ggpubr")
+library("tidyverse")
+library("kableExtra")
+library("knitr")
+library("tidylog")
+library("readxl")
+library("geobr")
+library("sf")
+library("wesanderson")
+library("ggplot2")
+library("stringr")
+library ("abjData")
+library("extrafont")
+library("lubridate")
+library("transformr")
+library("reactable")
+library("rnaturalearth")
+library("plotly")
+library("ggrepel")
+library('googlesheets4')
+library("leaflet")
+library('ggthemes')
+library('rmdformats')
+library("janitor")
+library("reactablefmtr")
+library("corrplot")
+library("lubridate")
+library("janitor")
+library("ggmap")
+library("stringr")
+library("stringi")
+library("ggthemes")
+library("ggiraph")
+library("patchwork")
+library("showtext")
+library("htmltools")
+library("gganimate")
+library("gifski")
+library("av")
+library("scales")
+library("png")
+library("magick")
+library("ggtext")
+library("waffle")
+library("MetBrewer")
+library("dplyr")
+library("glue")
+library("marquee")
+library("geobr")
+library("readr")
+
+```
+
+
+
+```{r}
+
+shapes_zona <- st_read("C:/Users/Thais Pereira/Documents/pesquisa_od/Shape/Zonas_2023.shp", options = "ENCODING=latin1")
+shapes_distrito <- st_read("C:/Users/Thais Pereira/Documents/pesquisa_od/Shape/Distritos_2023_region.shp", options = "ENCODING=latin1")
+shapes_municipio <- st_read("C:/Users/Thais Pereira/Documents/pesquisa_od/Shape/Municipios_2023.shp", options = "ENCODING=latin1")
+dados_informalidade <- st_read("C:/Users/Thais Pereira/Documents/pesquisa_od/Shape/Municipios_2023.shp", options = "ENCODING=latin1")
+pop_informalidade_zona_residencia <- read_excel("C:/Users/Thais Pereira/Documents/pesquisa_od/Tabelas_Site_OD2023_070225.xlsx", sheet = 8, skip = 8)
+pop_informalidade_zona_emprego <- read_excel("C:/Users/Thais Pereira/Documents/pesquisa_od/Tabelas_Site_OD2023_070225.xlsx", sheet = 13, skip = 7)
+
+
+```
+
+
+```{r}
+
+
+# Informalidade por zona
+
+# informalidade por zona/distrito/cidade de residencia
+
+
+novos_nomes <- c("Zona", "Assalariado_Carteira", "Assalariado_Sem_Carteira", 
+                 "Funcionario_Publico", "Profissional_Liberal", "Autonomo_com_CNPJ",  "Autonomo_sem_CNPJ", "Empregador", 
+                 "Dono_Negocio_Familiar", "Trabalhador_Familiar", "Total")
+
+
+
+Tx_Informalidade_zona_residencia <- pop_informalidade_zona_residencia %>% 
+  set_names(novos_nomes) %>% 
+  slice(-1) %>%
+  slice(1:(n() - 7)) %>% 
+  mutate(across(where(is.numeric), ~ round(.x, 0))) %>% 
+  mutate(Informalidade = Assalariado_Sem_Carteira + Autonomo_sem_CNPJ + Trabalhador_Familiar) %>% 
+  mutate(Tx_Informalidade_zona_residencia = Informalidade / Total) %>% 
+  select(Zona, Tx_Informalidade_zona_residencia)
+
+# informalidade por zona/distrito/cidade de emprego
+
+
+novos_nomes_1 <- c("Zona", "Assalariado_Carteira", "Assalariado_Sem_Carteira", 
+                 "Funcionario_Publico", "Profissional_Liberal", "Autonomo", "Empregador", 
+                 "Dono_Negocio_Familiar", "Trabalhador_Familiar", "Total_empregos")
+
+
+dados_emprego <- pop_informalidade_zona_emprego %>%
+  set_names(novos_nomes_1) %>% 
+  slice(-1) %>%
+  slice(1:(n() - 7)) %>% 
+  mutate(across(where(is.numeric), ~ round(.x, 0))) %>%
+  mutate(Informalidade = Assalariado_Sem_Carteira + Autonomo + Trabalhador_Familiar)
+
+
+Tx_Informalidade_zona_emprego <-  dados_emprego %>%
+  mutate(Tx_Informalidade_zona_emprego = Informalidade / Total_empregos) %>%
+  select(Zona, Tx_Informalidade_zona_emprego) %>% 
+  left_join(Tx_Informalidade_zona_residencia, by = "Zona")
+
+shapes_zona <- shapes_zona %>% mutate(NumeroZona = as.character(NumeroZona))
+
+Tx_Informalidade_distrito_emprego <-  dados_emprego %>% 
+    left_join(shapes_zona, by = c("Zona" = "NumeroZona")) %>% 
+    group_by(NomeDistri) %>% 
+    summarise(Total_empregos_distrito = sum(Total_empregos), 
+              Total_informalidade_distrito = sum(Informalidade)) %>% 
+   mutate(Tx_Informalidade_distrito_emprego = Total_informalidade_distrito / Total_empregos_distrito)
+  
+
+Tx_Informalidade_cidade_emprego <-  dados_emprego %>% 
+    left_join(shapes_zona, by = c("Zona" = "NumeroZona")) %>% 
+    group_by(NomeMunici) %>% 
+    summarise(Total_empregos_distrito = sum(Total_empregos), 
+              Total_informalidade_distrito = sum(Informalidade)) %>% 
+   mutate(Tx_Informalidade_distrito_emprego = Total_informalidade_distrito / Total_empregos_distrito)
+
+
+
+```
+
+
+```{r}
+
+# Ajuste dos dataframes com dados espaciais
+
+shapes_distrito_1 <- shapes_distrito %>% 
+  rename(geometry_distrito = geometry, 
+         NumDistrit = NumeroDist) %>% 
+  as.data.frame() %>% 
+  select(NumDistrit, geometry_distrito)
+  
+  
+shapes_municipio_1 <- shapes_municipio %>% 
+  rename(geometry_municipio = geometry, 
+         NumeroMuni = NumeroMuni) %>% 
+  as.data.frame() %>% 
+   select(NumeroMuni, geometry_municipio)
+
+
+shapes_zona %>% 
+  rename(geometry_zona = geometry, 
+         Zona =  NumeroZona) %>% 
+  select(- Area_ha_2) %>% 
+  as.data.frame() %>%
+  mutate(Zona = as.character(Zona)) %>% 
+  left_join(shapes_distrito_1, by = "NumDistrit") %>% 
+  left_join(shapes_municipio_1, by = "NumeroMuni") %>% 
+  left_join(Tx_Informalidade, by = "Zona")
+  
+
+```
+
+
+
+```{r}
+
+# Informalidade por Distrito
+
+
+
+```
+
+
+
+
+
+
+
+
+
+
