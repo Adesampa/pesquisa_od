@@ -72,116 +72,386 @@ library("readr")
 
 ```
 
+Dados de 2023
 
 ```{r}
 
 # Definição de caminhos para evitar repetição
-base_path <- "C:/Users/Thais Pereira/Documents/pesquisa_od/"
-shape_path <- file.path(base_path, "Shape")
-excel_path <- file.path(base_path, "Tabelas_Site_OD2023_070225.xlsx")
+base_path <- "C:/Users/Thais Pereira/Documents/pesquisa_od/pesquisa_2023"
+shape_path <- file.path(base_path, "Shape_2023")
+excel_path <- file.path(base_path, "Tabelas_2023.xlsx") 
 
 # Leitura de arquivos shapefile
 shapes <- list(
-  zona = st_read(file.path(shape_path, "Zonas_2023.shp"), options = "ENCODING=latin1"),
-  distrito = st_read(file.path(shape_path, "Distritos_2023_region.shp"), options = "ENCODING=latin1"),
-  municipio = st_read(file.path(shape_path, "Municipios_2023.shp"), options = "ENCODING=latin1")
+  zona_2023 = st_read(file.path(shape_path, "Zonas_2023.shp"), options = "ENCODING=latin1"),
+  distrito_2023 = st_read(file.path(shape_path, "Distritos_2023.shp"), options = "ENCODING=latin1"),
+  municipio_2023 = st_read(file.path(shape_path, "Municipios_2023.shp"), options = "ENCODING=latin1")
 )
 
 # Leitura de arquivos Excel
 pop_informalidade <- list(
-  zona_residencia = read_excel(excel_path, sheet = 8, skip = 8),
-  zona_emprego = read_excel(excel_path, sheet = 13, skip = 7)
+  ocupacao = read_excel(excel_path, sheet = 1, skip = 8),
+  classe_emprego = read_excel(excel_path, sheet = 2, skip = 9),
+  setor_emprego = read_excel(excel_path, sheet = 3, skip = 7),
+  zona_emprego = read_excel(excel_path, sheet = 4, skip = 7),
+  vinculo_emprego = read_excel(excel_path, sheet = 5, skip = 8),
+  viagens_motivo_origem = read_excel(excel_path, sheet = 6, skip = 8),
+  viagens_motivo_destino = read_excel(excel_path, sheet = 7, skip = 8)
 )
 
 # Renomeação de colunas
-nomes_residencia <- c("Zona", "Assalariado_Carteira", "Assalariado_Sem_Carteira", 
-                      "Funcionario_Publico", "Profissional_Liberal", "Autonomo_com_CNPJ", 
-                      "Autonomo_sem_CNPJ", "Empregador", "Dono_Negocio_Familiar", 
-                      "Trabalhador_Familiar", "Total")
 
-nomes_emprego <- c("Zona", "Assalariado_Carteira", "Assalariado_Sem_Carteira", 
-                   "Funcionario_Publico", "Profissional_Liberal", "Autonomo", 
-                   "Empregador", "Dono_Negocio_Familiar", "Trabalhador_Familiar", 
-                   "Total_empregos")
+nomes_ocupacao <- c("Zona", "Ocupado", "Faz_Bico", 
+                   "Em_Licenca_Medica", "Aposentado", "Sem_Trabalho", 
+                   "Nunca_Trabalhou", "Dona de Casa", "Estudante", "Total")
 
-# Processamento dos dados de informalidade por zona de residência
-informalidade <- pop_informalidade$zona_residencia %>%
-  set_names(nomes_residencia) %>%
+nomes_classe_emprego <- c("Zona", "Agricola_classe", "Construcao_Civil_classe", 
+                   "Industria_classe", "Comercio_classe", "Transporte_de_Carga_classe", 
+                   "Transporte_de_Passageiros_classe", "Crediticios_Financeiro_classe", 
+                   "Pessoais_classe", "Alimentacao_classe", "Saude_classe", "Educacao_classe", 
+                   "Especializado_classe", "Administracao_Publica_classe", "Outras_classes", "Total_classes")
+
+nomes_setor_emprego <- c("Zona", "Setor_Secundario", "Setor_Terciario", "Setores_Outros", "Setores_Total")
+
+
+nomes_zona_emprego <- c("Zona", "Assalariado_Carteira_emprego", "Assalariado_Sem_Carteira_emprego", 
+                   "Funcionario_Publico_emprego", "Profissional_Liberal_emprego", "Autonomo_emprego", 
+                   "Empregador_emprego", "Dono_Negocio_Familiar_emprego",
+                   "Trabalhador_Familiar_emprego", "Total_empregos")
+
+nomes_vinculo_emprego <- c("Zona", "Assalariado_Carteira_vinculo", "Assalariado_Sem_Carteira_vinculo", 
+                      "Funcionario_Publico_vinculo", "Profissional_Liberal_vinculo", 
+                      "Autonomo_com_CNPJ_vinculo", "Autonomo_sem_CNPJ_vinculo", 
+                      "Empregador_vinculo", "Dono_Negocio_Familiar_vinculo", 
+                      "Trabalhador_Familiar_vinculo", "Total_vinculo")
+
+nomes_viagens_motivo_origem <- c("Zona", 
+                   "Trabalho_Industria_origem", "Trabalho_Comercio_origem", 
+                   "Trabalho_Servicos_origem", "Educacao_origem", "Compras_origem", 
+                   "Saude_origem", "Lazer_origem", "Procurar_Emprego_origem", 
+                   "Assuntos_Pessoais_origem", "Refeicao_origem", "Total_Viagens_Origem")
+
+
+nomes_viagens_motivo_destino <- c("Zona", 
+                   "Trabalho_Industria_destino", "Trabalho_Comercio_destino", 
+                   "Trabalho_Servicos_destino", "Educacao_destino", "Compras_destino", 
+                   "Saude_destino", "Lazer_destino", "Procurar_Emprego_destino", 
+                   "Assuntos_Pessoais_destino", "Refeicao_destino", "Total_Viagens_Destino")
+
+
+# Processamento dos dados de informalidade pde ocupacao
+
+ocupacao_2023 <- pop_informalidade$ocupacao %>%
+  set_names(nomes_ocupacao) %>%
+  slice(-c(1, (n()-4):n())) %>%
+  mutate_if(is.character, as.numeric) %>% 
+  mutate(across(where(is.numeric), round, 0)) %>%
+  rename(Total_ocupados_nao_ocupados = Total) %>% 
+  select(Zona, Ocupado, Total_ocupados_nao_ocupados) %>% 
+  mutate(Zona = as.character(Zona))
+
+# Processamento dos dados de setor dos empregos
+
+setor_emprego_2023 <- pop_informalidade$setor_emprego %>%
+  set_names(nomes_setor_emprego) %>%
   slice(-c(1, (n()-6):n())) %>%
-  mutate(across(where(is.numeric), round, 0),
-         Informalidade = Assalariado_Sem_Carteira + Autonomo_sem_CNPJ,
-         total_formal_informal = Total) %>%
-  select(Zona, Informalidade, total_formal_informal)
+  mutate_if(is.character, as.numeric) %>% 
+  mutate(across(where(is.numeric), round, 0)) %>% 
+  mutate(Zona = as.character(Zona))
+
+
+# Processamento dos dados de classe dos empregos
+
+classe_emprego_2023 <- pop_informalidade$classe_emprego %>%
+  set_names(nomes_classe_emprego) %>%
+  slice(-c(2, (n()-6):n())) %>%
+  mutate_if(is.character, as.numeric) %>% 
+  mutate(across(where(is.numeric), round, 0)) %>% 
+  mutate(Zona = as.character(Zona))
 
 # Processamento dos dados de emprego formal por zona de emprego
-emprego_formal <- pop_informalidade$zona_emprego %>%
-  set_names(nomes_emprego) %>%
+zona_emprego_formal_2023 <- pop_informalidade$zona_emprego %>%
+  set_names(nomes_zona_emprego) %>%
   slice(-c(1, (n()-6):n())) %>%
   mutate(across(where(is.numeric), round, 0),
-         empregos_formais = Assalariado_Carteira + Funcionario_Publico + 
-                            Profissional_Liberal + Empregador + Dono_Negocio_Familiar) %>%
+         empregos_formais = Assalariado_Carteira_emprego + Funcionario_Publico_emprego + 
+                            Profissional_Liberal_emprego + Empregador_emprego + Dono_Negocio_Familiar_emprego) %>%
   select(Zona, empregos_formais, Total_empregos)
 
+
+# Processamento dos dados de informalidade por zona de residência
+informalidade_2023 <- pop_informalidade$vinculo_emprego %>%
+  set_names(nomes_vinculo_emprego) %>%
+  slice(-c(1, (n()-3):n())) %>%
+  mutate(across(where(is.numeric), round, 0),
+         Informalidade = Assalariado_Sem_Carteira_vinculo + Autonomo_sem_CNPJ_vinculo,
+         total_formal_informal = Total_vinculo) %>%
+  select(Zona, Informalidade, total_formal_informal)
+
+
+# Processamento dos dados de motivo destino
+
+viagens_motivo_destino_2023 <- pop_informalidade$viagens_motivo_destino %>%
+  set_names(nomes_viagens_motivo_destino) %>%
+  slice(-c(1, (n()-3):n())) %>%
+  mutate_if(is.character, as.numeric) %>% 
+  mutate(Zona = as.character(Zona)) %>% 
+  mutate(across(where(is.numeric), round, 0)) 
+
+
+# Processamento dos dados de motivo origem
+
+viagens_motivo_origem_2023 <- pop_informalidade$viagens_motivo_origem %>%
+  set_names(nomes_viagens_motivo_origem) %>%
+  slice(-c(1, (n()-3):n())) %>%
+  mutate_if(is.character, as.numeric) %>% 
+  mutate(Zona = as.character(Zona)) %>% 
+  mutate(across(where(is.numeric), round, 0))
+
 # Ajuste dos dataframes espaciais
-shapes_distrito <- shapes$distrito %>%
+shapes_distrito <- shapes$distrito_2023 %>%
   rename(geometry_distrito = geometry, NumDistrit = NumeroDist) %>%
   select(NumDistrit, geometry_distrito)
 
-shapes_municipio <- shapes$municipio %>%
+shapes_municipio <- shapes$municipio_2023 %>%
   rename(geometry_municipio = geometry, NumeroMuni = NumeroMuni) %>%
   select(NumeroMuni, geometry_municipio)
 
 # Junção final dos dados espaciais
-dados <- shapes$zona %>% 
+dados_2023 <- shapes$zona_2023 %>% 
   as.data.frame() %>% 
   rename(geometry_zona = geometry, Zona = NumeroZona) %>%
+  mutate(Zona = as.character(Zona)) %>% 
   select(-Area_ha_2) %>%
   mutate(Zona = as.character(Zona)) %>%
   left_join(shapes_distrito, by = "NumDistrit") %>%
   left_join(shapes_municipio, by = "NumeroMuni") %>%
-  left_join(informalidade, by = "Zona") %>%
-  left_join(emprego_formal, by = "Zona") %>% 
+  left_join(ocupacao_2023, by = "Zona") %>%
+  left_join(setor_emprego_2023, by = "Zona") %>% 
+  left_join(classe_emprego_2023, by = "Zona") %>% 
+  left_join(zona_emprego_formal_2023, by = "Zona") %>% 
+  left_join(informalidade_2023, by = "Zona") %>% 
+  left_join(viagens_motivo_destino_2023, by = "Zona") %>% 
+  left_join(viagens_motivo_origem_2023, by = "Zona") %>% 
   mutate(across(everything(), ~ replace_na(.x, 0)))
 
-write.csv(dados, "dados_od")
+
+# Salvando os data frames num geo package
+
+
+st_write(dados_2023 %>% select(-geometry_distrito, -geometry_municipio),"od_dados_2023.gpkg", layer = "zona")
+
+st_write(dados_2023 %>%
+  filter(NomeMunici == "São Paulo") %>% 
+  select(-geometry_zona, -geometry_municipio, -Zona, -NomeZona, -NumeroMuni, -NomeMunici, -NumDistrit) %>% 
+  group_by(NomeDistri) %>% 
+  summarise(across(where(is.numeric), sum, na.rm = TRUE),  # Soma apenas colunas numéricas
+            geometry = st_union(geometry_distrito)), "od_dados_2023.gpkg", layer = "distrito")
+
+
+st_write(dados_2023 %>% 
+  select(-Zona, -NomeZona, -NumDistrit, -NomeDistri, -geometry_zona, -geometry_distrito) %>% 
+  group_by(NomeMunici) %>% 
+  summarise(across(where(is.numeric), sum, na.rm = TRUE),
+  geometry = st_union(geometry_municipio)), "od_dados_2023.gpkg", layer = "cidade")
 
 ```
 
 
+Dados 2017
 
 ```{r}
 
-# Funções 
+# Definição de caminhos para evitar repetição
+base_path <- "C:/Users/Thais Pereira/Documents/pesquisa_od/pesquisa_2017"
+shape_path <- file.path(base_path, "Shape_2017")
+excel_path <- file.path(base_path, "Tabelas_2017.xlsx") 
 
-# tabela com taxa de informalidade por zona de residência
+# Leitura de arquivos shapefile
+shapes <- list(
+  zona_2017 = st_read(file.path(shape_path, "Zonas_2017.shp"), options = "ENCODING=latin1"),
+  distrito_2017 = st_read(file.path(shape_path, "Distritos_2017.shp"), options = "ENCODING=latin1"),
+  municipio_2017 = st_read(file.path(shape_path, "Municipios_2017.shp"), options = "ENCODING=latin1")
+)
 
-dados %>% 
-  mutate(tx_informalidade = Informalidade/total_formal_informal*100) %>% 
-  select(NomeZona, geometry_zona, Informalidade, total_formal_informal, tx_informalidade) %>% 
-  arrange(- tx_informalidade)
-
-
-# tabela com taxa de informalidade por zona de distrito
-
-dados %>% 
-  group_by(NomeDistri, geometry_distrito) %>% 
-  summarise(Informalidade = sum(Informalidade), 
-            total_formal_informal = sum(total_formal_informal)) %>% 
-  mutate(tx_informalidade = Informalidade/total_formal_informal*100) %>% 
-  arrange(- tx_informalidade)
-
-# tabela com taxa de informalidade por zona de municipio
-
-dados %>% 
-  group_by(NomeMunici, geometry_municipio) %>% 
-  summarise(Informalidade = sum(Informalidade), 
-            total_formal_informal = sum(total_formal_informal)) %>% 
-  mutate(tx_informalidade = Informalidade/total_formal_informal*100) %>% 
-  arrange(- tx_informalidade)
+# Leitura de arquivos Excel
+pop_informalidade_2017 <- list(
+  ocupacao = read_excel(excel_path, sheet = 1, skip = 8),
+  classe_emprego = read_excel(excel_path, sheet = 2, skip = 9),
+  setor_emprego = read_excel(excel_path, sheet = 3, skip = 6),
+  zona_emprego = read_excel(excel_path, sheet = 4, skip = 7),
+  vinculo_emprego = read_excel(excel_path, sheet = 5, skip = 7),
+  viagens_motivo_origem = read_excel(excel_path, sheet = 6, skip = 8),
+  viagens_motivo_destino = read_excel(excel_path, sheet = 7, skip = 8)
+)
 
 
+# Renomeação de colunas
+
+nomes_ocupacao <- c("Zona", "Ocupado", "Faz_Bico", 
+                   "Em_Licenca_Medica", "Aposentado", "Sem_Trabalho", 
+                   "Nunca_Trabalhou", "Dona de Casa", "Estudante", "Total")
+
+nomes_classe_emprego <- c("Zona", "Agricola_classe", "Construcao_Civil_classe", 
+                   "Industria_classe", "Comercio_classe", "Transporte_de_Carga_classe", 
+                   "Transporte_de_Passageiros_classe", "Crediticios_Financeiro_classe", 
+                   "Pessoais_classe", "Alimentacao_classe", "Saude_classe", "Educacao_classe", 
+                   "Especializado_classe", "Administracao_Publica_classe", "Outras_classes", "Total_classes")
+
+nomes_setor_emprego <- c("Zona", "Setor_Secundario", "Setor_Terciario", "Setores_Outros", "Setores_Total")
+
+
+nomes_zona_emprego <- c("Zona", "Assalariado_Carteira_emprego", "Assalariado_Sem_Carteira_emprego", 
+                   "Funcionario_Publico_emprego", "Autonomo_emprego", "Empregador_emprego", 
+                   "Profissional_Liberal_emprego", "Dono_Negocio_Familiar_emprego", 
+                   "Trabalhador_Familiar_emprego", "Total_empregos")
+
+nomes_vinculo_emprego <- c("Zona", "Assalariado_Carteira_vinculo", "Assalariado_Sem_Carteira_vinculo", 
+                      "Funcionario_Publico_vinculo", "Autonomo_vinculo",  "Empregador_vinculo",
+                      "Profissional_Liberal_vinculo", "Dono_Negocio_Familiar_vinculo", 
+                      "Trabalhador_Familiar_vinculo", "Total_vinculo")
+
+nomes_viagens_motivo_origem <- c("Zona", 
+                   "Trabalho_Industria_origem", "Trabalho_Comercio_origem", "Trabalho_Servicos_origem", 
+                   "Educacao_origem", "Compras_origem", "Saude_origem", "Lazer_origem", 
+                   "Procurar_Emprego_origem", "Assuntos_Pessoais_origem", 
+                   "Refeicao_origem", "Total_Viagens_Origem")
+
+
+nomes_viagens_motivo_destino <- c("Zona", 
+                   "Trabalho_Industria_destino", "Trabalho_Comercio_destino", 
+                   "Trabalho_Servicos_destino", "Educacao_destino", "Compras_destino", 
+                   "Saude_destino", "Lazer_destino", "Procurar_Emprego_destino", 
+                   "Assuntos_Pessoais_destino", "Refeicao_destino", "Total_Viagens_Destino")
+
+
+# Processamento dos dados de informalidade pde ocupacao
+
+ocupacao_2017 <- pop_informalidade_2017$ocupacao %>%
+  set_names(nomes_ocupacao) %>%
+  slice(-c(1, (n()-3):n())) %>%
+  mutate_if(is.character, as.numeric) %>% 
+  mutate(across(where(is.numeric), round, 0)) %>%
+  rename(Total_ocupados_nao_ocupados = Total) %>% 
+  select(Zona, Ocupado, Total_ocupados_nao_ocupados) %>% 
+  mutate(Zona = as.character(Zona))
+
+# Processamento dos dados de setor dos empregos
+
+setor_emprego_2017 <- pop_informalidade_2017$setor_emprego %>%
+  set_names(nomes_setor_emprego) %>%
+  slice(-c(1, (n()-4):n())) %>%
+  filter(if_any(everything(), ~ !is.na(.))) %>% 
+  mutate_if(is.character, as.numeric) %>% 
+  mutate(across(where(is.numeric), round, 0)) %>% 
+  mutate(Zona = as.character(Zona))
+
+
+# Processamento dos dados de classe dos empregos
+
+classe_emprego_2017 <- pop_informalidade_2017$classe_emprego %>%
+  set_names(nomes_classe_emprego) %>%
+  slice(-c(1, (n()-3):n())) %>%
+  mutate_if(is.character, as.numeric) %>% 
+  mutate(across(where(is.numeric), round, 0)) %>% 
+  mutate(Zona = as.character(Zona))
+
+# Processamento dos dados de emprego formal por zona de emprego
+zona_emprego_formal_2017 <- pop_informalidade_2017$zona_emprego %>%
+  set_names(nomes_zona_emprego) %>%
+  slice(-c(1, (n()-3):n())) %>%
+  mutate(across(where(is.numeric), round, 0),
+         empregos_formais = Assalariado_Carteira_emprego + Funcionario_Publico_emprego + 
+                            Profissional_Liberal_emprego + Empregador_emprego + Dono_Negocio_Familiar_emprego) %>%
+  select(Zona, empregos_formais, Total_empregos)
+
+
+# Processamento dos dados de informalidade por zona de residência
+informalidade_2017 <- pop_informalidade_2017$vinculo_emprego %>%
+  set_names(nomes_vinculo_emprego) %>%
+  slice(-c(1, (n()-3):n())) %>%
+  filter(if_any(everything(), ~ !is.na(.))) %>%
+  mutate(across(where(is.character), as.numeric),  # Substitui mutate_if
+         Zona = as.character(Zona),
+         across(where(is.numeric), round, 0),
+         Informalidade = Assalariado_Sem_Carteira_vinculo + Autonomo_vinculo,
+         total_formal_informal = Total_vinculo) %>%
+  select(Zona, Informalidade, total_formal_informal)
+
+
+
+# Processamento dos dados de motivo destino
+
+viagens_motivo_destino_2017 <- pop_informalidade_2017$viagens_motivo_destino %>%
+  set_names(nomes_viagens_motivo_destino) %>%
+  slice(-c(1, (n()-3):n())) %>%
+  mutate_if(is.character, as.numeric) %>% 
+  mutate(Zona = as.character(Zona)) %>% 
+  mutate(across(where(is.numeric), round, 0))
+
+
+# Processamento dos dados de motivo origem
+
+viagens_motivo_origem_2017 <- pop_informalidade_2017$viagens_motivo_origem %>%
+  set_names(nomes_viagens_motivo_origem) %>%
+  slice(-c(1, (n()-3):n())) %>%
+  mutate_if(is.character, as.numeric) %>% 
+  mutate(Zona = as.character(Zona)) %>% 
+  mutate(across(where(is.numeric), round, 0))
+
+# Ajuste dos dataframes espaciais
+shapes_distrito_2017 <- shapes$distrito_2017 %>%
+  rename(geometry_distrito = geometry, NumDistrit = NumeroDist) %>%
+  select(NumDistrit, geometry_distrito)
+
+shapes_municipio_2017 <- shapes$municipio_2017 %>%
+  rename(geometry_municipio = geometry, NumeroMuni = NumeroMuni) %>%
+  select(NumeroMuni, geometry_municipio)
+
+# Junção final dos dados espaciais
+dados_2017 <- shapes$zona_2017 %>% 
+  as.data.frame() %>% 
+  rename(geometry_zona = geometry, Zona = NumeroZona) %>%
+  mutate(Zona = as.character(Zona)) %>% 
+  select(-Area_ha_2) %>%
+  mutate(Zona = as.character(Zona)) %>%
+  left_join(shapes_distrito_2017, by = "NumDistrit") %>%
+  left_join(shapes_municipio_2017, by = "NumeroMuni") %>%
+  left_join(ocupacao_2017, by = "Zona") %>%
+  left_join(setor_emprego_2017, by = "Zona") %>% 
+  left_join(classe_emprego_2017, by = "Zona") %>% 
+  left_join(zona_emprego_formal_2017, by = "Zona") %>% 
+  left_join(informalidade_2017, by = "Zona") %>% 
+  left_join(viagens_motivo_destino_2017, by = "Zona") %>% 
+  left_join(viagens_motivo_origem_2017, by = "Zona") %>% 
+  mutate(across(everything(), ~ replace_na(.x, 0)))
+
+# Salvando os data frames num geo package
+
+
+st_write(dados_2017 %>% select(-geometry_distrito, -geometry_municipio),"od_dados_2017.gpkg", layer = "zona_2017")
+
+st_write(dados_2017 %>%
+  filter(NomeMunici == "São Paulo") %>% 
+  select(-geometry_zona, -geometry_municipio, -Zona, -NomeZona, -NumeroMuni, -NomeMunici, -NumDistrit) %>% 
+  group_by(NomeDistri) %>% 
+  summarise(across(where(is.numeric), sum, na.rm = TRUE),  # Soma apenas colunas numéricas
+            geometry = st_union(geometry_distrito)), "od_dados_2017.gpkg", layer = "distrito_2017")
+
+
+st_write(dados_2017 %>% 
+  select(-Zona, -NomeZona, -NumDistrit, -NomeDistri, -geometry_zona, -geometry_distrito) %>% 
+  group_by(NomeMunici) %>% 
+  summarise(across(where(is.numeric), sum, na.rm = TRUE),
+  geometry = st_union(geometry_municipio)), "od_dados_2017.gpkg", layer = "cidade_2017")
 
 ```
+
+
+
+
+
+
 
 
 
